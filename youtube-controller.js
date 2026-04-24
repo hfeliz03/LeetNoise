@@ -1,4 +1,13 @@
+const OWNERSHIP_KEY = "leetnoiseOwnedPlayer";
+
+captureOwnershipMarker();
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "GET_LEETNOISE_OWNERSHIP") {
+    sendResponse({ owned: sessionStorage.getItem(OWNERSHIP_KEY) === "1" });
+    return false;
+  }
+
   if (message?.type !== "CONTROL_YOUTUBE_PLAYBACK") {
     return false;
   }
@@ -27,3 +36,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   sendResponse({ ok: false, error: "Unknown playback command." });
   return false;
 });
+
+function captureOwnershipMarker() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("leetnoise") === "1") {
+      sessionStorage.setItem(OWNERSHIP_KEY, "1");
+    }
+  } catch (error) {
+    console.debug("LeetNoise could not read ownership marker", error);
+  }
+}

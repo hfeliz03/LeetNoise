@@ -2,6 +2,10 @@ let playerTabId = null;
 let playerVideoId = null;
 const LEETNOISE_MARKER_KEY = "leetnoise";
 const LEETNOISE_MARKER_VALUE = "1";
+const SESSION_KEYS = {
+  playerTabId: "playerTabId",
+  playerVideoId: "playerVideoId"
+};
 
 chrome.runtime.onInstalled.addListener(async () => {
   const stored = await chrome.storage.sync.get(["videos", "defaultVideoId", "autoPlayOnTimer"]);
@@ -68,8 +72,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === playerTabId) {
-    playerTabId = null;
-    playerVideoId = null;
+    void clearPlayerSession();
   }
 });
 
@@ -127,11 +130,10 @@ async function startPlayback(videoId, sender) {
       }
 
       await chrome.tabs.update(playerTabId, { url, active: false });
-      playerVideoId = videoId;
+      await updatePlayerSession(playerTabId, videoId);
       return;
     } catch (error) {
-      playerTabId = null;
-      playerVideoId = null;
+      await clearPlayerSession();
     }
   }
 
@@ -142,8 +144,7 @@ async function startPlayback(videoId, sender) {
     index: typeof sourceIndex === "number" ? sourceIndex + 1 : undefined
   });
 
-  playerTabId = createdTab.id ?? null;
-  playerVideoId = videoId;
+  await updatePlayerSession(createdTab.id ?? null, videoId);
 }
 
 function buildWatchUrl(videoId) {
@@ -212,17 +213,16 @@ async function stopPlayback() {
   try {
     await chrome.tabs.remove(playerTabId);
   } finally {
-    playerTabId = null;
-    playerVideoId = null;
+    await clearPlayerSession();
   }
 }
 
 async function reconcileOwnedTabs() {
+  await loadPlayerSession();
   const ownedTabs = await findOwnedTabs();
 
   if (ownedTabs.length === 0) {
-    playerTabId = null;
-    playerVideoId = null;
+    await clearPlayerSession();
     return;
   }
 
@@ -233,22 +233,51 @@ async function reconcileOwnedTabs() {
     await chrome.tabs.remove(extraTabs.map((tab) => tab.id).filter((id) => typeof id === "number"));
   }
 
-  playerTabId = primaryTab.id ?? null;
-  playerVideoId = extractVideoIdFromTab(primaryTab);
+  await updatePlayerSession(primaryTab.id ?? null, extractVideoIdFromTab(primaryTab));
 }
 
 async function findOwnedTabs() {
-  const tabs = await chrome.tabs.query({
-    url: `https://www.youtube.com/*${LEETNOISE_MARKER_KEY}=${LEETNOISE_MARKER_VALUE}*`
+  const youtubeTabs = await chrome.tabs.query({
+    url: "https://www.youtube.com/*"
   });
 
-  return tabs
-    .filter((tab) => typeof tab.id === "number" && tab.url)
+  const ownedTabs = [];
+
+  for (const tab of youtubeTabs) {
+    if (typeof tab.id !== "number" || !tab.url) {
+      continue;
+    }
+
+    const isOwned = await isOwnedPlayerTab(tab.id);
+    if (isOwned) {
+      ownedTabs.push(tab);
+    }
+  }
+
+  return ownedTabs
     .sort((a, b) => {
+      if (a.id === playerTabId) {
+        return -1;
+      }
+      if (b.id === playerTabId) {
+        return 1;
+      }
       const aId = a.id ?? 0;
       const bId = b.id ?? 0;
       return aId - bId;
     });
+}
+
+async function isOwnedPlayerTab(tabId) {
+  try {
+    await waitForTabReady(tabId);
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: "GET_LEETNOISE_OWNERSHIP"
+    });
+    return response?.owned === true;
+  } catch (error) {
+    return false;
+  }
 }
 
 function extractVideoIdFromTab(tab) {
@@ -262,4 +291,33 @@ function extractVideoIdFromTab(tab) {
   } catch (error) {
     return null;
   }
+}
+
+async function loadPlayerSession() {
+  const stored = await chrome.storage.session.get([
+    SESSION_KEYS.playerTabId,
+    SESSION_KEYS.playerVideoId
+  ]);
+
+  playerTabId = typeof stored[SESSION_KEYS.playerTabId] === "number" ? stored[SESSION_KEYS.playerTabId] : null;
+  playerVideoId = typeof stored[SESSION_KEYS.playerVideoId] === "string" ? stored[SESSION_KEYS.playerVideoId] : null;
+}
+
+async function updatePlayerSession(nextTabId, nextVideoId) {
+  playerTabId = typeof nextTabId === "number" ? nextTabId : null;
+  playerVideoId = typeof nextVideoId === "string" ? nextVideoId : null;
+
+  await chrome.storage.session.set({
+    [SESSION_KEYS.playerTabId]: playerTabId,
+    [SESSION_KEYS.playerVideoId]: playerVideoId
+  });
+}
+
+async function clearPlayerSession() {
+  playerTabId = null;
+  playerVideoId = null;
+  await chrome.storage.session.remove([
+    SESSION_KEYS.playerTabId,
+    SESSION_KEYS.playerVideoId
+  ]);
 }
