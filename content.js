@@ -1,6 +1,15 @@
-const TIMER_LABELS = ["timer", "time", "chronometer", "countdown"];
+const START_PATTERNS = ["start timer", "start stopwatch"];
+const STOP_PATTERNS = [
+  "end timer",
+  "stop timer",
+  "reset timer",
+  "end stopwatch",
+  "stop stopwatch",
+  "reset stopwatch"
+];
 
-let lastTriggerAt = 0;
+let lastActionKey = "";
+let lastActionAt = 0;
 
 document.addEventListener("click", async (event) => {
   const target = event.target instanceof Element ? event.target : null;
@@ -8,25 +17,29 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  const trigger = findTimerTrigger(target);
-  if (!trigger) {
+  const action = findTimerAction(target);
+  if (!action) {
     return;
   }
 
   const now = Date.now();
-  if (now - lastTriggerAt < 1500) {
+  const actionKey = `${action.type}:${action.label}`;
+  if (actionKey === lastActionKey && now - lastActionAt < 1500) {
     return;
   }
-  lastTriggerAt = now;
+  lastActionKey = actionKey;
+  lastActionAt = now;
 
   try {
-    await chrome.runtime.sendMessage({ type: "PLAY_DEFAULT_VIDEO" });
+    await chrome.runtime.sendMessage({
+      type: action.type === "start" ? "PLAY_DEFAULT_VIDEO" : "STOP_PLAYBACK"
+    });
   } catch (error) {
-    console.debug("LeetNoise failed to trigger playback", error);
+    console.debug("LeetNoise failed to handle timer action", error);
   }
 }, true);
 
-function findTimerTrigger(startNode) {
+function findTimerAction(startNode) {
   const candidates = [startNode, startNode.closest("button"), startNode.closest("[role='button']")].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -41,8 +54,12 @@ function findTimerTrigger(startNode) {
       candidate.getAttribute("data-e2e-locator")
     ].filter(Boolean).join(" "));
 
-    if (TIMER_LABELS.some((label) => combinedText.includes(label))) {
-      return candidate;
+    if (START_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
+      return { type: "start", label: combinedText };
+    }
+
+    if (STOP_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
+      return { type: "stop", label: combinedText };
     }
   }
 

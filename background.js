@@ -1,8 +1,4 @@
-const PLAYER_WIDTH = 420;
-const PLAYER_HEIGHT = 320;
-
 let playerTabId = null;
-let playerWindowId = null;
 
 chrome.runtime.onInstalled.addListener(async () => {
   const stored = await chrome.storage.sync.get(["videos", "defaultVideoId", "autoPlayOnTimer"]);
@@ -27,12 +23,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "PLAY_DEFAULT_VIDEO") {
-    void handlePlayDefaultVideo(sendResponse);
+    void handlePlayDefaultVideo(sendResponse, sender);
     return true;
   }
 
   if (message.type === "PLAY_VIDEO_BY_ID") {
-    void openOrUpdatePlayer(message.videoId).then(() => {
+    void openOrUpdatePlayer(message.videoId, sender).then(() => {
       sendResponse({ ok: true });
     }).catch((error) => {
       sendResponse({ ok: false, error: error.message });
@@ -56,18 +52,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === playerTabId) {
     playerTabId = null;
-    playerWindowId = null;
   }
 });
 
-chrome.windows.onRemoved.addListener((windowId) => {
-  if (windowId === playerWindowId) {
-    playerTabId = null;
-    playerWindowId = null;
-  }
-});
-
-async function handlePlayDefaultVideo(sendResponse) {
+async function handlePlayDefaultVideo(sendResponse, sender) {
   try {
     const { videos, defaultVideoId, autoPlayOnTimer } = await chrome.storage.sync.get([
       "videos",
@@ -89,39 +77,45 @@ async function handlePlayDefaultVideo(sendResponse) {
       return;
     }
 
-    await openOrUpdatePlayer(selectedVideoId);
+    await openOrUpdatePlayer(selectedVideoId, sender);
     sendResponse({ ok: true, videoId: selectedVideoId });
   } catch (error) {
     sendResponse({ ok: false, error: error.message });
   }
 }
 
-async function openOrUpdatePlayer(videoId) {
+async function openOrUpdatePlayer(videoId, sender) {
   const url = buildWatchUrl(videoId);
+  const sourceTabId = sender?.tab?.id ?? null;
+  const sourceWindowId = sender?.tab?.windowId ?? null;
+  const sourceIndex = sender?.tab?.index ?? null;
 
   if (playerTabId !== null) {
     try {
-      await chrome.tabs.update(playerTabId, { url, active: false });
-      if (playerWindowId !== null) {
-        await chrome.windows.update(playerWindowId, { focused: true });
+      const existingTab = await chrome.tabs.get(playerTabId);
+      const targetWindowId = sourceWindowId ?? existingTab.windowId;
+      const moveProperties = { windowId: targetWindowId };
+
+      if (typeof sourceIndex === "number") {
+        moveProperties.index = sourceIndex + 1;
       }
+
+      await chrome.tabs.move(playerTabId, moveProperties);
+      await chrome.tabs.update(playerTabId, { url, active: false });
       return;
     } catch (error) {
       playerTabId = null;
-      playerWindowId = null;
     }
   }
 
-  const createdWindow = await chrome.windows.create({
+  const createdTab = await chrome.tabs.create({
     url,
-    type: "popup",
-    width: PLAYER_WIDTH,
-    height: PLAYER_HEIGHT,
-    focused: true
+    active: false,
+    windowId: sourceWindowId ?? undefined,
+    index: typeof sourceIndex === "number" ? sourceIndex + 1 : undefined
   });
 
-  playerWindowId = createdWindow.id ?? null;
-  playerTabId = createdWindow.tabs?.[0]?.id ?? null;
+  playerTabId = createdTab.id ?? null;
 }
 
 function buildWatchUrl(videoId) {
@@ -157,6 +151,5 @@ async function stopPlayback() {
     await chrome.tabs.remove(playerTabId);
   } finally {
     playerTabId = null;
-    playerWindowId = null;
   }
 }
