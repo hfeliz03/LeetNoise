@@ -1,5 +1,7 @@
 let playerTabId = null;
 let playerVideoId = null;
+const LEETNOISE_MARKER_KEY = "leetnoise";
+const LEETNOISE_MARKER_VALUE = "1";
 
 chrome.runtime.onInstalled.addListener(async () => {
   const stored = await chrome.storage.sync.get(["videos", "defaultVideoId", "autoPlayOnTimer"]);
@@ -73,6 +75,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 async function handleStartDefaultVideo(sendResponse, sender) {
   try {
+    await reconcileOwnedTabs();
     const { videos, defaultVideoId, autoPlayOnTimer } = await chrome.storage.sync.get([
       "videos",
       "defaultVideoId",
@@ -101,6 +104,7 @@ async function handleStartDefaultVideo(sendResponse, sender) {
 }
 
 async function startPlayback(videoId, sender) {
+  await reconcileOwnedTabs();
   const url = buildWatchUrl(videoId);
   const sourceWindowId = sender?.tab?.windowId ?? null;
   const sourceIndex = sender?.tab?.index ?? null;
@@ -145,13 +149,15 @@ async function startPlayback(videoId, sender) {
 function buildWatchUrl(videoId) {
   const params = new URLSearchParams({
     v: videoId,
-    autoplay: "1"
+    autoplay: "1",
+    [LEETNOISE_MARKER_KEY]: LEETNOISE_MARKER_VALUE
   });
 
   return `https://www.youtube.com/watch?${params.toString()}`;
 }
 
 async function getStatus() {
+  await reconcileOwnedTabs();
   const { videos, defaultVideoId, autoPlayOnTimer } = await chrome.storage.sync.get([
     "videos",
     "defaultVideoId",
@@ -168,6 +174,7 @@ async function getStatus() {
 }
 
 async function controlPlayback(command) {
+  await reconcileOwnedTabs();
   if (playerTabId === null) {
     return;
   }
@@ -197,6 +204,7 @@ async function waitForTabReady(tabId) {
 }
 
 async function stopPlayback() {
+  await reconcileOwnedTabs();
   if (playerTabId === null) {
     return;
   }
@@ -206,5 +214,52 @@ async function stopPlayback() {
   } finally {
     playerTabId = null;
     playerVideoId = null;
+  }
+}
+
+async function reconcileOwnedTabs() {
+  const ownedTabs = await findOwnedTabs();
+
+  if (ownedTabs.length === 0) {
+    playerTabId = null;
+    playerVideoId = null;
+    return;
+  }
+
+  const primaryTab = ownedTabs[0];
+  const extraTabs = ownedTabs.slice(1);
+
+  if (extraTabs.length > 0) {
+    await chrome.tabs.remove(extraTabs.map((tab) => tab.id).filter((id) => typeof id === "number"));
+  }
+
+  playerTabId = primaryTab.id ?? null;
+  playerVideoId = extractVideoIdFromTab(primaryTab);
+}
+
+async function findOwnedTabs() {
+  const tabs = await chrome.tabs.query({
+    url: `https://www.youtube.com/*${LEETNOISE_MARKER_KEY}=${LEETNOISE_MARKER_VALUE}*`
+  });
+
+  return tabs
+    .filter((tab) => typeof tab.id === "number" && tab.url)
+    .sort((a, b) => {
+      const aId = a.id ?? 0;
+      const bId = b.id ?? 0;
+      return aId - bId;
+    });
+}
+
+function extractVideoIdFromTab(tab) {
+  if (!tab.url) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(tab.url);
+    return parsed.searchParams.get("v");
+  } catch (error) {
+    return null;
   }
 }
