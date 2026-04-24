@@ -1,5 +1,5 @@
 const ACTION_DEFINITIONS = [
-  { type: "start", labels: ["start timer", "start stopwatch"], requiresTimerContext: false },
+  { type: "start", labels: ["start timer", "start stopwatch", "start"], requiresTimerContext: true },
   { type: "resume", labels: ["resume timer", "resume stopwatch", "resume"], requiresTimerContext: true },
   { type: "pause", labels: ["pause timer", "pause stopwatch", "pause"], requiresTimerContext: true },
   {
