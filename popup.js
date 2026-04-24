@@ -80,6 +80,16 @@ videoList.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "copy") {
+    const match = state.videos.find((video) => video.id === id);
+    if (!match) {
+      return;
+    }
+    await navigator.clipboard.writeText(match.sourceUrl);
+    setMessage("Link copied.", true);
+    return;
+  }
+
   if (action === "delete") {
     const videos = state.videos.filter((video) => video.id !== id);
     const defaultVideoId = state.defaultVideoId === id ? videos[0]?.id ?? null : state.defaultVideoId;
@@ -113,18 +123,17 @@ function render() {
     item.className = "video-item";
 
     const isDefault = video.id === state.defaultVideoId;
-    const sourceLabel = video.sourceUrl.replace(/^https?:\/\//, "");
 
     item.innerHTML = `
       <div class="video-row">
         <div>
           <div class="video-title">${escapeHtml(video.name)}</div>
-          <div class="video-meta">${escapeHtml(sourceLabel)}</div>
         </div>
         ${isDefault ? '<span class="default-pill">Default</span>' : ""}
       </div>
       <div class="video-actions">
         <button data-action="play" data-id="${video.id}">Play</button>
+        <button data-action="copy" data-id="${video.id}">Copy link</button>
         <button data-action="default" data-id="${video.id}">${isDefault ? "Selected" : "Make default"}</button>
         <button data-action="delete" data-id="${video.id}">Delete</button>
       </div>
