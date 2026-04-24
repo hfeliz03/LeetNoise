@@ -1,4 +1,6 @@
 const START_PATTERNS = ["start timer", "start stopwatch"];
+const RESUME_PATTERNS = ["resume timer", "resume stopwatch"];
+const PAUSE_PATTERNS = ["pause timer", "pause stopwatch"];
 const STOP_PATTERNS = [
   "end timer",
   "stop timer",
@@ -34,7 +36,7 @@ async function handleInteraction(event) {
 
   try {
     await chrome.runtime.sendMessage({
-      type: action.type === "start" ? "PLAY_DEFAULT_VIDEO" : "STOP_PLAYBACK"
+      type: mapActionToMessage(action.type)
     });
   } catch (error) {
     console.debug("LeetNoise failed to handle timer action", error);
@@ -58,6 +60,14 @@ function findTimerAction(event) {
 
     if (START_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
       return { type: "start", label: combinedText };
+    }
+
+    if (RESUME_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
+      return { type: "resume", label: combinedText };
+    }
+
+    if (PAUSE_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
+      return { type: "pause", label: combinedText };
     }
 
     if (STOP_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
@@ -112,4 +122,20 @@ function addCandidate(element, elements, seen) {
 
 function normalizeText(value) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function mapActionToMessage(actionType) {
+  if (actionType === "start") {
+    return "START_DEFAULT_VIDEO";
+  }
+
+  if (actionType === "resume") {
+    return "RESUME_PLAYBACK";
+  }
+
+  if (actionType === "pause") {
+    return "PAUSE_PLAYBACK";
+  }
+
+  return "STOP_PLAYBACK";
 }

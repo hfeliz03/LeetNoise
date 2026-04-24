@@ -1,4 +1,5 @@
 let playerTabId = null;
+let playerVideoId = null;
 
 chrome.runtime.onInstalled.addListener(async () => {
   const stored = await chrome.storage.sync.get(["videos", "defaultVideoId", "autoPlayOnTimer"]);
@@ -22,13 +23,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  if (message.type === "PLAY_DEFAULT_VIDEO") {
-    void handlePlayDefaultVideo(sendResponse, sender);
+  if (message.type === "START_DEFAULT_VIDEO") {
+    void handleStartDefaultVideo(sendResponse, sender);
     return true;
   }
 
   if (message.type === "PLAY_VIDEO_BY_ID") {
-    void openOrUpdatePlayer(message.videoId, sender).then(() => {
+    void startPlayback(message.videoId, sender).then(() => {
       sendResponse({ ok: true });
     }).catch((error) => {
       sendResponse({ ok: false, error: error.message });
@@ -46,16 +47,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "PAUSE_PLAYBACK") {
+    void controlPlayback("pause").then(() => sendResponse({ ok: true })).catch((error) => {
+      sendResponse({ ok: false, error: error.message });
+    });
+    return true;
+  }
+
+  if (message.type === "RESUME_PLAYBACK") {
+    void controlPlayback("play").then(() => sendResponse({ ok: true })).catch((error) => {
+      sendResponse({ ok: false, error: error.message });
+    });
+    return true;
+  }
+
   return false;
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === playerTabId) {
     playerTabId = null;
+    playerVideoId = null;
   }
 });
 
-async function handlePlayDefaultVideo(sendResponse, sender) {
+async function handleStartDefaultVideo(sendResponse, sender) {
   try {
     const { videos, defaultVideoId, autoPlayOnTimer } = await chrome.storage.sync.get([
       "videos",
@@ -77,16 +93,15 @@ async function handlePlayDefaultVideo(sendResponse, sender) {
       return;
     }
 
-    await openOrUpdatePlayer(selectedVideoId, sender);
+    await startPlayback(selectedVideoId, sender);
     sendResponse({ ok: true, videoId: selectedVideoId });
   } catch (error) {
     sendResponse({ ok: false, error: error.message });
   }
 }
 
-async function openOrUpdatePlayer(videoId, sender) {
+async function startPlayback(videoId, sender) {
   const url = buildWatchUrl(videoId);
-  const sourceTabId = sender?.tab?.id ?? null;
   const sourceWindowId = sender?.tab?.windowId ?? null;
   const sourceIndex = sender?.tab?.index ?? null;
 
@@ -101,10 +116,18 @@ async function openOrUpdatePlayer(videoId, sender) {
       }
 
       await chrome.tabs.move(playerTabId, moveProperties);
+
+      if (playerVideoId === videoId) {
+        await controlPlayback("play");
+        return;
+      }
+
       await chrome.tabs.update(playerTabId, { url, active: false });
+      playerVideoId = videoId;
       return;
     } catch (error) {
       playerTabId = null;
+      playerVideoId = null;
     }
   }
 
@@ -116,6 +139,7 @@ async function openOrUpdatePlayer(videoId, sender) {
   });
 
   playerTabId = createdTab.id ?? null;
+  playerVideoId = videoId;
 }
 
 function buildWatchUrl(videoId) {
@@ -138,8 +162,24 @@ async function getStatus() {
     hasVideos: Array.isArray(videos) && videos.length > 0,
     defaultVideoId: defaultVideoId || null,
     autoPlayOnTimer: autoPlayOnTimer !== false,
-    playerOpen: playerTabId !== null
+    playerOpen: playerTabId !== null,
+    playerVideoId
   };
+}
+
+async function controlPlayback(command) {
+  if (playerTabId === null) {
+    return;
+  }
+
+  try {
+    await chrome.tabs.sendMessage(playerTabId, {
+      type: "CONTROL_YOUTUBE_PLAYBACK",
+      command
+    });
+  } catch (error) {
+    throw new Error("Unable to control the YouTube tab.");
+  }
 }
 
 async function stopPlayback() {
@@ -151,5 +191,6 @@ async function stopPlayback() {
     await chrome.tabs.remove(playerTabId);
   } finally {
     playerTabId = null;
+    playerVideoId = null;
   }
 }
