@@ -11,13 +11,15 @@ const STOP_PATTERNS = [
 let lastActionKey = "";
 let lastActionAt = 0;
 
-document.addEventListener("click", async (event) => {
-  const target = event.target instanceof Element ? event.target : null;
-  if (!target) {
-    return;
+document.addEventListener("click", handleInteraction, true);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    void handleInteraction(event);
   }
+}, true);
 
-  const action = findTimerAction(target);
+async function handleInteraction(event) {
+  const action = findTimerAction(event);
   if (!action) {
     return;
   }
@@ -37,22 +39,22 @@ document.addEventListener("click", async (event) => {
   } catch (error) {
     console.debug("LeetNoise failed to handle timer action", error);
   }
-}, true);
+}
 
-function findTimerAction(startNode) {
-  const candidates = [startNode, startNode.closest("button"), startNode.closest("[role='button']")].filter(Boolean);
+function findTimerAction(event) {
+  const candidates = collectCandidates(event);
 
   for (const candidate of candidates) {
-    if (!(candidate instanceof Element)) {
-      continue;
-    }
-
     const combinedText = normalizeText([
       candidate.textContent,
       candidate.getAttribute("aria-label"),
       candidate.getAttribute("title"),
       candidate.getAttribute("data-e2e-locator")
     ].filter(Boolean).join(" "));
+
+    if (!combinedText) {
+      continue;
+    }
 
     if (START_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
       return { type: "start", label: combinedText };
@@ -64,6 +66,48 @@ function findTimerAction(startNode) {
   }
 
   return null;
+}
+
+function collectCandidates(event) {
+  const elements = [];
+  const seen = new Set();
+  const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+
+  for (const item of path) {
+    if (!(item instanceof Element)) {
+      continue;
+    }
+
+    addCandidate(item, elements, seen);
+    addCandidate(item.closest("button"), elements, seen);
+    addCandidate(item.closest("[role='button']"), elements, seen);
+
+    let parent = item.parentElement;
+    let depth = 0;
+    while (parent && depth < 4) {
+      addCandidate(parent, elements, seen);
+      parent = parent.parentElement;
+      depth += 1;
+    }
+  }
+
+  const target = event.target instanceof Element ? event.target : null;
+  if (target) {
+    addCandidate(target, elements, seen);
+    addCandidate(target.closest("button"), elements, seen);
+    addCandidate(target.closest("[role='button']"), elements, seen);
+  }
+
+  return elements;
+}
+
+function addCandidate(element, elements, seen) {
+  if (!(element instanceof Element) || seen.has(element)) {
+    return;
+  }
+
+  seen.add(element);
+  elements.push(element);
 }
 
 function normalizeText(value) {
