@@ -7,20 +7,23 @@ const ACTION_DEFINITIONS = [
     labels: [
       "end timer",
       "stop timer",
-      "reset timer",
       "end stopwatch",
       "stop stopwatch",
-      "reset stopwatch",
       "stop",
-      "reset",
       "end"
     ],
+    requiresTimerContext: true
+  },
+  {
+    type: "reset",
+    labels: ["reset timer", "reset stopwatch", "reset"],
     requiresTimerContext: true
   }
 ];
 
 let lastActionKey = "";
 let lastActionAt = 0;
+let lastAcceptedSignalAt = 0;
 
 document.addEventListener("click", handleInteraction, true);
 document.addEventListener("keydown", (event) => {
@@ -28,6 +31,7 @@ document.addEventListener("keydown", (event) => {
     void handleInteraction(event);
   }
 }, true);
+observeAcceptedSubmissions();
 
 async function handleInteraction(event) {
   const action = findTimerAction(event);
@@ -44,8 +48,13 @@ async function handleInteraction(event) {
   lastActionAt = now;
 
   try {
+    const messageType = mapActionToMessage(action.type);
+    if (messageType === null) {
+      return;
+    }
+
     await chrome.runtime.sendMessage({
-      type: mapActionToMessage(action.type)
+      type: messageType
     });
   } catch (error) {
     console.debug("LeetNoise failed to handle timer action", error);
@@ -189,5 +198,66 @@ function mapActionToMessage(actionType) {
     return "PAUSE_PLAYBACK";
   }
 
+  if (actionType === "reset") {
+    return null;
+  }
+
   return "STOP_PLAYBACK";
+}
+
+function observeAcceptedSubmissions() {
+  const observer = new MutationObserver(() => {
+    if (!hasAcceptedSubmissionSignal()) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastAcceptedSignalAt < 3000) {
+      return;
+    }
+    lastAcceptedSignalAt = now;
+
+    void chrome.runtime.sendMessage({ type: "STOP_PLAYBACK" }).catch((error) => {
+      console.debug("LeetNoise failed to stop after accepted submission", error);
+    });
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+}
+
+function hasAcceptedSubmissionSignal() {
+  const selectors = [
+    "[data-e2e-locator='submission-result']",
+    "[data-e2e-locator='console-result']",
+    "[role='dialog']",
+    "[class*='result']",
+    "[class*='submission']"
+  ];
+
+  for (const selector of selectors) {
+    for (const element of document.querySelectorAll(selector)) {
+      const text = normalizeText(element.textContent || "");
+      if (isAcceptedSubmissionText(text)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function isAcceptedSubmissionText(text) {
+  if (!text) {
+    return false;
+  }
+
+  return (
+    text.includes("accepted") ||
+    text.includes("all test cases passed") ||
+    text.includes("runtime beats") ||
+    text.includes("memory beats")
+  );
 }
