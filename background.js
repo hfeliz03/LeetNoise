@@ -1,4 +1,3 @@
-const PLAYER_PAGE = chrome.runtime.getURL("player.html");
 const PLAYER_WIDTH = 420;
 const PLAYER_HEIGHT = 320;
 
@@ -98,7 +97,7 @@ async function handlePlayDefaultVideo(sendResponse) {
 }
 
 async function openOrUpdatePlayer(videoId) {
-  const url = `${PLAYER_PAGE}?videoId=${encodeURIComponent(videoId)}`;
+  const url = buildWatchUrl(videoId);
 
   if (playerTabId !== null) {
     try {
@@ -123,6 +122,15 @@ async function openOrUpdatePlayer(videoId) {
 
   playerWindowId = createdWindow.id ?? null;
   playerTabId = createdWindow.tabs?.[0]?.id ?? null;
+}
+
+function buildWatchUrl(videoId) {
+  const params = new URLSearchParams({
+    v: videoId,
+    autoplay: "1"
+  });
+
+  return `https://www.youtube.com/watch?${params.toString()}`;
 }
 
 async function getStatus() {
