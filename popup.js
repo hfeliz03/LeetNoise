@@ -7,11 +7,19 @@ const formMessage = document.getElementById("form-message");
 const autoPlayToggle = document.getElementById("auto-play-toggle");
 const stopPlaybackButton = document.getElementById("stop-playback");
 const videoList = document.getElementById("video-list");
+const themeOptions = document.getElementById("theme-options");
+
+const THEMES = [
+  { id: "leetcode-light", label: "Light", swatches: ["#fff7e6", "#ffa116", "#262626"] },
+  { id: "leetcode-dark", label: "Dark", swatches: ["#1a1a1a", "#2c2c2c", "#ffa116"] },
+  { id: "leetcode-midnight", label: "Midnight", swatches: ["#0f1115", "#1f252d", "#ffa116"] }
+];
 
 let state = {
   videos: [],
   defaultVideoId: null,
-  autoPlayOnTimer: true
+  autoPlayOnTimer: true,
+  themeId: THEMES[0].id
 };
 
 bootstrap().catch((error) => {
@@ -50,6 +58,21 @@ autoPlayToggle.addEventListener("change", async () => {
 stopPlaybackButton.addEventListener("click", async () => {
   await chrome.runtime.sendMessage({ type: "STOP_PLAYBACK" });
   setMessage("Player stopped.", true);
+});
+
+themeOptions.addEventListener("click", async (event) => {
+  const target = event.target instanceof HTMLElement ? event.target.closest("[data-theme-id]") : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const themeId = target.dataset.themeId;
+  if (!themeId || themeId === state.themeId) {
+    return;
+  }
+
+  await persistState({ themeId });
+  setMessage("Theme updated.", true);
 });
 
 videoList.addEventListener("click", async (event) => {
@@ -99,11 +122,12 @@ videoList.addEventListener("click", async (event) => {
 });
 
 async function bootstrap() {
-  const stored = await chrome.storage.sync.get(["videos", "defaultVideoId", "autoPlayOnTimer"]);
+  const stored = await chrome.storage.sync.get(["videos", "defaultVideoId", "autoPlayOnTimer", "themeId"]);
   state = {
     videos: Array.isArray(stored.videos) ? stored.videos : [],
     defaultVideoId: stored.defaultVideoId || null,
-    autoPlayOnTimer: stored.autoPlayOnTimer !== false
+    autoPlayOnTimer: stored.autoPlayOnTimer !== false,
+    themeId: THEMES.some((theme) => theme.id === stored.themeId) ? stored.themeId : THEMES[0].id
   };
   autoPlayToggle.checked = state.autoPlayOnTimer;
   render();
@@ -116,7 +140,9 @@ async function persistState(partialState) {
 }
 
 function render() {
+  document.body.dataset.theme = state.themeId;
   videoList.innerHTML = "";
+  renderThemes();
 
   for (const video of state.videos) {
     const item = document.createElement("li");
@@ -140,6 +166,32 @@ function render() {
     `;
 
     videoList.appendChild(item);
+  }
+}
+
+function renderThemes() {
+  themeOptions.innerHTML = "";
+
+  for (const theme of THEMES) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "theme-option";
+    option.dataset.themeId = theme.id;
+    option.setAttribute("role", "radio");
+    option.setAttribute("aria-checked", String(theme.id === state.themeId));
+
+    if (theme.id === state.themeId) {
+      option.classList.add("is-active");
+    }
+
+    option.innerHTML = `
+      <span class="theme-swatch-row">
+        ${theme.swatches.map((color) => `<span class="theme-swatch" style="background:${color}"></span>`).join("")}
+      </span>
+      <span class="theme-label">${escapeHtml(theme.label)}</span>
+    `;
+
+    themeOptions.appendChild(option);
   }
 }
 

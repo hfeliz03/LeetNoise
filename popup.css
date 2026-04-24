@@ -1,14 +1,58 @@
 :root {
   color-scheme: light;
-  --bg: #f6f1e8;
-  --panel: #fffaf2;
-  --ink: #182028;
-  --muted: #5c6670;
-  --line: #d9cdbb;
-  --accent: #a64b2a;
-  --accent-strong: #8b3518;
-  --accent-soft: #f0dfd5;
-  --success: #296047;
+}
+
+body[data-theme="leetcode-light"] {
+  --bg: #f7f7f8;
+  --bg-grad-top: rgba(255, 161, 22, 0.14);
+  --bg-grad-bottom: #f3ead8;
+  --panel: rgba(255, 250, 242, 0.92);
+  --panel-solid: #fffaf2;
+  --ink: #262626;
+  --muted: #5f5f5f;
+  --line: #e2d4bf;
+  --accent: #ffa116;
+  --accent-strong: #ff8f00;
+  --accent-soft: #ffe7c2;
+  --success: #2f9e44;
+  --shadow: rgba(17, 24, 39, 0.08);
+  --kbd-bg: rgba(255, 255, 255, 0.9);
+}
+
+body[data-theme="leetcode-dark"] {
+  color-scheme: dark;
+  --bg: #141414;
+  --bg-grad-top: rgba(255, 161, 22, 0.14);
+  --bg-grad-bottom: #1a1a1a;
+  --panel: rgba(38, 38, 38, 0.94);
+  --panel-solid: #262626;
+  --ink: #f5f5f5;
+  --muted: #bfbfbf;
+  --line: #3a3a3a;
+  --accent: #ffa116;
+  --accent-strong: #ffb84d;
+  --accent-soft: #33250d;
+  --success: #4ade80;
+  --shadow: rgba(0, 0, 0, 0.35);
+  --kbd-bg: rgba(24, 24, 24, 0.95);
+}
+
+body[data-theme="leetcode-midnight"] {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --bg-grad-top: rgba(255, 161, 22, 0.12);
+  --bg-grad-bottom: #151a21;
+  --panel: rgba(32, 38, 46, 0.94);
+  --panel-solid: #20262e;
+  --ink: #eef2f7;
+  --muted: #aab3bf;
+  --line: #39424d;
+  --accent: #ffa116;
+  --accent-strong: #ffb84d;
+  --accent-soft: #2e2414;
+  --success: #4ade80;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --kbd-bg: rgba(18, 22, 28, 0.95);
 }
 
 * {
@@ -20,8 +64,8 @@ body {
   width: 380px;
   font-family: Georgia, "Times New Roman", serif;
   background:
-    radial-gradient(circle at top, rgba(166, 75, 42, 0.15), transparent 45%),
-    linear-gradient(180deg, #f8f3eb 0%, #efe5d6 100%);
+    radial-gradient(circle at top, var(--bg-grad-top), transparent 45%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-grad-bottom) 100%);
   color: var(--ink);
 }
 
@@ -57,19 +101,22 @@ body {
 .status-row,
 .video-list,
 .notice,
+.theme-panel,
 .tips {
   margin-top: 16px;
 }
 
 .controls,
 .notice,
+.theme-panel,
 .tips,
 .video-item {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(255, 250, 242, 0.92);
+  background: var(--panel);
   backdrop-filter: blur(8px);
+  box-shadow: 0 10px 24px var(--shadow);
 }
 
 .field {
@@ -89,7 +136,7 @@ input[type="url"] {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--panel-solid);
   color: var(--ink);
   font: inherit;
 }
@@ -110,7 +157,7 @@ button {
 .primary {
   width: 100%;
   background: var(--accent);
-  color: #fff8f4;
+  color: #1a1a1a;
 }
 
 .primary:hover {
@@ -157,7 +204,7 @@ button {
   border: 1px dashed var(--line);
   border-radius: 16px;
   color: var(--muted);
-  background: rgba(255, 250, 242, 0.55);
+  background: color-mix(in srgb, var(--panel-solid) 70%, transparent);
 }
 
 .video-item {
@@ -179,7 +226,7 @@ button {
 .default-pill {
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(41, 96, 71, 0.12);
+  background: color-mix(in srgb, var(--success) 18%, transparent);
   color: var(--success);
   font-size: 12px;
 }
@@ -213,11 +260,49 @@ kbd {
   border: 1px solid var(--line);
   border-bottom-width: 2px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--kbd-bg);
   color: var(--ink);
   font-family: inherit;
   font-size: 12px;
   text-align: center;
+}
+
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.theme-option {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-solid);
+  color: var(--ink);
+  text-align: left;
+}
+
+.theme-option.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.theme-swatch-row {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-swatch {
+  width: 100%;
+  height: 18px;
+  border-radius: 999px;
+}
+
+.theme-label {
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .tips ul {
