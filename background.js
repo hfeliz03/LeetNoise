@@ -173,12 +173,26 @@ async function controlPlayback(command) {
   }
 
   try {
+    await waitForTabReady(playerTabId);
     await chrome.tabs.sendMessage(playerTabId, {
       type: "CONTROL_YOUTUBE_PLAYBACK",
       command
     });
   } catch (error) {
     throw new Error("Unable to control the YouTube tab.");
+  }
+}
+
+async function waitForTabReady(tabId) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.status === "complete") {
+      return;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 150);
+    });
   }
 }
 

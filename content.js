@@ -1,13 +1,22 @@
-const START_PATTERNS = ["start timer", "start stopwatch"];
-const RESUME_PATTERNS = ["resume timer", "resume stopwatch"];
-const PAUSE_PATTERNS = ["pause timer", "pause stopwatch"];
-const STOP_PATTERNS = [
-  "end timer",
-  "stop timer",
-  "reset timer",
-  "end stopwatch",
-  "stop stopwatch",
-  "reset stopwatch"
+const ACTION_DEFINITIONS = [
+  { type: "start", labels: ["start timer", "start stopwatch"], requiresTimerContext: false },
+  { type: "resume", labels: ["resume timer", "resume stopwatch", "resume"], requiresTimerContext: true },
+  { type: "pause", labels: ["pause timer", "pause stopwatch", "pause"], requiresTimerContext: true },
+  {
+    type: "stop",
+    labels: [
+      "end timer",
+      "stop timer",
+      "reset timer",
+      "end stopwatch",
+      "stop stopwatch",
+      "reset stopwatch",
+      "stop",
+      "reset",
+      "end"
+    ],
+    requiresTimerContext: true
+  }
 ];
 
 let lastActionKey = "";
@@ -47,31 +56,22 @@ function findTimerAction(event) {
   const candidates = collectCandidates(event);
 
   for (const candidate of candidates) {
-    const combinedText = normalizeText([
-      candidate.textContent,
-      candidate.getAttribute("aria-label"),
-      candidate.getAttribute("title"),
-      candidate.getAttribute("data-e2e-locator")
-    ].filter(Boolean).join(" "));
-
-    if (!combinedText) {
+    const labels = extractCandidateLabels(candidate);
+    if (labels.length === 0) {
       continue;
     }
 
-    if (START_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
-      return { type: "start", label: combinedText };
-    }
+    for (const action of ACTION_DEFINITIONS) {
+      const matchedLabel = labels.find((label) => action.labels.includes(label));
+      if (!matchedLabel) {
+        continue;
+      }
 
-    if (RESUME_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
-      return { type: "resume", label: combinedText };
-    }
+      if (action.requiresTimerContext && !hasTimerContext(candidate)) {
+        continue;
+      }
 
-    if (PAUSE_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
-      return { type: "pause", label: combinedText };
-    }
-
-    if (STOP_PATTERNS.some((pattern) => combinedText.includes(pattern))) {
-      return { type: "stop", label: combinedText };
+      return { type: action.type, label: matchedLabel };
     }
   }
 
@@ -88,36 +88,88 @@ function collectCandidates(event) {
       continue;
     }
 
-    addCandidate(item, elements, seen);
-    addCandidate(item.closest("button"), elements, seen);
-    addCandidate(item.closest("[role='button']"), elements, seen);
-
-    let parent = item.parentElement;
-    let depth = 0;
-    while (parent && depth < 4) {
-      addCandidate(parent, elements, seen);
-      parent = parent.parentElement;
-      depth += 1;
-    }
+    addInteractiveCandidate(item, elements, seen);
+    addInteractiveCandidate(item.closest("button"), elements, seen);
+    addInteractiveCandidate(item.closest("[role='button']"), elements, seen);
   }
 
   const target = event.target instanceof Element ? event.target : null;
   if (target) {
-    addCandidate(target, elements, seen);
-    addCandidate(target.closest("button"), elements, seen);
-    addCandidate(target.closest("[role='button']"), elements, seen);
+    addInteractiveCandidate(target, elements, seen);
+    addInteractiveCandidate(target.closest("button"), elements, seen);
+    addInteractiveCandidate(target.closest("[role='button']"), elements, seen);
   }
 
   return elements;
 }
 
-function addCandidate(element, elements, seen) {
+function addInteractiveCandidate(element, elements, seen) {
   if (!(element instanceof Element) || seen.has(element)) {
+    return;
+  }
+
+  if (!isInteractiveElement(element)) {
     return;
   }
 
   seen.add(element);
   elements.push(element);
+}
+
+function isInteractiveElement(element) {
+  const tagName = element.tagName.toLowerCase();
+  return tagName === "button" || element.getAttribute("role") === "button";
+}
+
+function extractCandidateLabels(candidate) {
+  const rawValues = [
+    candidate.getAttribute("aria-label"),
+    candidate.getAttribute("title"),
+    candidate.getAttribute("data-e2e-locator"),
+    candidate.textContent
+  ].filter(Boolean);
+
+  const labels = new Set();
+
+  for (const value of rawValues) {
+    const normalized = normalizeText(value);
+    if (!normalized) {
+      continue;
+    }
+
+    labels.add(normalized);
+
+    for (const line of normalized.split("\n")) {
+      const trimmedLine = normalizeText(line);
+      if (trimmedLine) {
+        labels.add(trimmedLine);
+      }
+    }
+  }
+
+  return [...labels];
+}
+
+function hasTimerContext(element) {
+  let current = element;
+  let depth = 0;
+
+  while (current && depth < 5) {
+    const contextText = normalizeText([
+      current.textContent,
+      current.getAttribute("aria-label"),
+      current.getAttribute("title")
+    ].filter(Boolean).join(" "));
+
+    if (/(timer|stopwatch|\b\d{1,2}:\d{2}:\d{2}\b|\bhr\b|\bmin\b)/.test(contextText)) {
+      return true;
+    }
+
+    current = current.parentElement;
+    depth += 1;
+  }
+
+  return false;
 }
 
 function normalizeText(value) {
