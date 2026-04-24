@@ -102,7 +102,8 @@ body {
 .video-list,
 .notice,
 .theme-panel,
-.tips {
+.tips,
+.popup-footer {
   margin-top: 16px;
 }
 
@@ -303,6 +304,27 @@ kbd {
 .theme-label {
   font-size: 13px;
   font-weight: 700;
+}
+
+.popup-footer {
+  padding-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.footer-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  text-decoration: underline;
+}
+
+.footer-separator {
+  margin: 0 6px;
+  color: var(--line);
 }
 
 .tips ul {
