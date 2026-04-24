@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeetNoise</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header class="hero">
+        <p class="eyebrow">LeetCode focus audio</p>
+        <h1>LeetNoise</h1>
+        <p class="subtitle">Save up to 6 YouTube videos and auto-play your default when the LeetCode timer starts.</p>
+      </header>
+
+      <section class="controls">
+        <label class="field">
+          <span>Name</span>
+          <input id="video-name" type="text" maxlength="40" placeholder="Brown noise">
+        </label>
+        <label class="field">
+          <span>YouTube URL</span>
+          <input id="video-url" type="url" placeholder="https://www.youtube.com/watch?v=...">
+        </label>
+        <button id="save-video" class="primary">Save video</button>
+        <p id="form-message" class="message" aria-live="polite"></p>
+      </section>
+
+      <section class="status-row">
+        <label class="toggle">
+          <input id="auto-play-toggle" type="checkbox">
+          <span>Auto-play on timer start</span>
+        </label>
+        <button id="stop-playback" class="secondary">Stop player</button>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <h2>Saved videos</h2>
+          <p>Pick one default. Maximum 6.</p>
+        </div>
+        <ul id="video-list" class="video-list"></ul>
+      </section>
+
+      <section class="tips">
+        <h2>Good video guidelines</h2>
+        <ul>
+          <li>Prefer 1 to 10 hour uploads so they do not end mid-problem.</li>
+          <li>Look for no talking, minimal intros, and stable ambient audio.</li>
+          <li>Brown noise is a strong default if outside noise is the main problem.</li>
+        </ul>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
