@@ -30,6 +30,7 @@ body {
 }
 
 .hero h1,
+.notice h2,
 .section-heading h2,
 .tips h2 {
   margin: 0;
@@ -55,11 +56,13 @@ body {
 .controls,
 .status-row,
 .video-list,
+.notice,
 .tips {
   margin-top: 16px;
 }
 
 .controls,
+.notice,
 .tips,
 .video-item {
   padding: 14px;
@@ -195,6 +198,26 @@ button {
 
 .message.success {
   color: var(--success);
+}
+
+.notice p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: center;
 }
 
 .tips ul {

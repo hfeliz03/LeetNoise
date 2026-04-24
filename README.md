@@ -22,5 +22,6 @@ LeetNoise is a Chrome extension MVP that lets you save up to six YouTube focus-a
 - This MVP uses heuristic timer detection on LeetCode by looking for clicks on controls labeled with terms like `timer`, `time`, or `chronometer`.
 - Chrome autoplay rules may still depend on prior user interaction with the extension.
 - Playback now uses the standard YouTube watch page in a sibling tab instead of an embedded iframe to avoid YouTube embed restrictions like `Error 153`.
-- Clicking `Start Timer` or `Start Stopwatch` on LeetCode should open or refresh the audio tab, and clicking end or reset controls should close it.
+- Clicking `Start Timer` or `Start Stopwatch` on LeetCode should open or refresh the audio tab, and clicking end or stop controls should close it.
+- Chrome may block audio in a newly opened background YouTube tab until the user visits that tab once. A simple workaround is to briefly switch to the LeetNoise-opened YouTube tab and then back to LeetCode.
 - Users can paste any YouTube link, but long-form ambient videos with no talking are best for focus sessions.
