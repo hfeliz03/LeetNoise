@@ -24,6 +24,7 @@ const ACTION_DEFINITIONS = [
 let lastActionKey = "";
 let lastActionAt = 0;
 let lastAcceptedSignalAt = 0;
+let submitPending = false;
 
 document.addEventListener("click", handleInteraction, true);
 document.addEventListener("keydown", (event) => {
@@ -34,6 +35,11 @@ document.addEventListener("keydown", (event) => {
 observeAcceptedSubmissions();
 
 async function handleInteraction(event) {
+  const submitIntent = findSubmitIntent(event);
+  if (submitIntent) {
+    submitPending = true;
+  }
+
   const action = findTimerAction(event);
   if (!action) {
     return;
@@ -205,9 +211,22 @@ function mapActionToMessage(actionType) {
   return "STOP_PLAYBACK";
 }
 
+function findSubmitIntent(event) {
+  const candidates = collectCandidates(event);
+
+  for (const candidate of candidates) {
+    const labels = extractCandidateLabels(candidate);
+    if (labels.includes("submit")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function observeAcceptedSubmissions() {
   const observer = new MutationObserver(() => {
-    if (!hasAcceptedSubmissionSignal()) {
+    if (!submitPending || !hasAcceptedSubmissionSignal()) {
       return;
     }
 
@@ -216,6 +235,7 @@ function observeAcceptedSubmissions() {
       return;
     }
     lastAcceptedSignalAt = now;
+    submitPending = false;
 
     void chrome.runtime.sendMessage({ type: "STOP_PLAYBACK" }).catch((error) => {
       console.debug("LeetNoise failed to stop after accepted submission", error);
@@ -232,10 +252,9 @@ function observeAcceptedSubmissions() {
 function hasAcceptedSubmissionSignal() {
   const selectors = [
     "[data-e2e-locator='submission-result']",
-    "[data-e2e-locator='console-result']",
     "[role='dialog']",
-    "[class*='result']",
-    "[class*='submission']"
+    "[class*='submission']",
+    "[class*='result']"
   ];
 
   for (const selector of selectors) {
@@ -255,9 +274,11 @@ function isAcceptedSubmissionText(text) {
   }
 
   return (
-    text.includes("accepted") ||
-    text.includes("all test cases passed") ||
-    text.includes("runtime beats") ||
-    text.includes("memory beats")
+    text.includes("accepted") &&
+    (
+      text.includes("submitted at") ||
+      text.includes("runtime beats") ||
+      text.includes("memory beats")
+    )
   );
 }
