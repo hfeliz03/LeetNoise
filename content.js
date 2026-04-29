@@ -226,7 +226,11 @@ function findSubmitIntent(event) {
 
 function observeAcceptedSubmissions() {
   const observer = new MutationObserver(() => {
-    if (!submitPending || !hasAcceptedSubmissionSignal()) {
+    if (!hasAcceptedSubmissionSignal()) {
+      return;
+    }
+
+    if (!submitPending && !isSubmissionPage()) {
       return;
     }
 
@@ -276,9 +280,14 @@ function isAcceptedSubmissionText(text) {
   return (
     text.includes("accepted") &&
     (
+      text.includes("testcases passed") ||
       text.includes("submitted at") ||
       text.includes("runtime beats") ||
       text.includes("memory beats")
     )
   );
+}
+
+function isSubmissionPage() {
+  return /\/submissions\/\d+/.test(window.location.pathname);
 }
