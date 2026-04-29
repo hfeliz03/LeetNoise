@@ -15,9 +15,21 @@
   "background": {
     "service_worker": "background.js"
   },
+  "icons": {
+    "16": "assets/LeetNoisePixelLogo.png",
+    "32": "assets/LeetNoisePixelLogo.png",
+    "48": "assets/LeetNoisePixelLogo.png",
+    "128": "assets/LeetNoisePixelLogo.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "LeetNoise"
+    "default_title": "LeetNoise",
+    "default_icon": {
+      "16": "assets/LeetNoise.png",
+      "32": "assets/LeetNoise.png",
+      "48": "assets/LeetNoise.png",
+      "128": "assets/LeetNoise.png"
+    }
   },
   "content_scripts": [
     {
