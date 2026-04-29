@@ -16,19 +16,19 @@
     "service_worker": "background.js"
   },
   "icons": {
-    "16": "assets/LeetNoisePixelLogoIcon.png",
-    "32": "assets/LeetNoisePixelLogoIcon.png",
-    "48": "assets/LeetNoisePixelLogoIcon.png",
-    "128": "assets/LeetNoisePixelLogoIcon.png"
+    "16": "assets/LeetNoise.png",
+    "32": "assets/LeetNoise.png",
+    "48": "assets/LeetNoise.png",
+    "128": "assets/LeetNoise.png"
   },
   "action": {
     "default_popup": "popup.html",
     "default_title": "LeetNoise",
     "default_icon": {
-      "16": "assets/LeetNoise.png",
-      "32": "assets/LeetNoise.png",
-      "48": "assets/LeetNoise.png",
-      "128": "assets/LeetNoise.png"
+      "16": "assets/LeetNoisePixelLogo.png",
+      "32": "assets/LeetNoisePixelLogo.png",
+      "48": "assets/LeetNoisePixelLogo.png",
+      "128": "assets/LeetNoisePixelLogo.png"
     }
   },
   "content_scripts": [
