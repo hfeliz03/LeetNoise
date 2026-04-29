@@ -16,10 +16,10 @@
     "service_worker": "background.js"
   },
   "icons": {
-    "16": "assets/LeetNoisePixelLogo.png",
-    "32": "assets/LeetNoisePixelLogo.png",
-    "48": "assets/LeetNoisePixelLogo.png",
-    "128": "assets/LeetNoisePixelLogo.png"
+    "16": "assets/LeetNoisePixelLogoIcon.png",
+    "32": "assets/LeetNoisePixelLogoIcon.png",
+    "48": "assets/LeetNoisePixelLogoIcon.png",
+    "128": "assets/LeetNoisePixelLogoIcon.png"
   },
   "action": {
     "default_popup": "popup.html",
