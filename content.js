@@ -25,6 +25,7 @@ let lastActionKey = "";
 let lastActionAt = 0;
 let lastAcceptedSignalAt = 0;
 let submitPending = false;
+let lastObservedPath = window.location.pathname;
 
 document.addEventListener("click", handleInteraction, true);
 document.addEventListener("keydown", (event) => {
@@ -33,6 +34,8 @@ document.addEventListener("keydown", (event) => {
   }
 }, true);
 observeAcceptedSubmissions();
+installRouteObservers();
+queueAcceptedSubmissionCheck();
 
 async function handleInteraction(event) {
   const submitIntent = findSubmitIntent(event);
@@ -226,24 +229,12 @@ function findSubmitIntent(event) {
 
 function observeAcceptedSubmissions() {
   const observer = new MutationObserver(() => {
-    if (!hasAcceptedSubmissionSignal()) {
-      return;
+    if (window.location.pathname !== lastObservedPath) {
+      lastObservedPath = window.location.pathname;
+      queueAcceptedSubmissionCheck();
     }
 
-    if (!submitPending && !isSubmissionPage()) {
-      return;
-    }
-
-    const now = Date.now();
-    if (now - lastAcceptedSignalAt < 3000) {
-      return;
-    }
-    lastAcceptedSignalAt = now;
-    submitPending = false;
-
-    void chrome.runtime.sendMessage({ type: "STOP_PLAYBACK" }).catch((error) => {
-      console.debug("LeetNoise failed to stop after accepted submission", error);
-    });
+    queueAcceptedSubmissionCheck();
   });
 
   observer.observe(document.documentElement, {
@@ -251,6 +242,64 @@ function observeAcceptedSubmissions() {
     subtree: true,
     characterData: true
   });
+}
+
+function installRouteObservers() {
+  const originalPushState = history.pushState.bind(history);
+  const originalReplaceState = history.replaceState.bind(history);
+
+  history.pushState = function (...args) {
+    const result = originalPushState(...args);
+    handleRouteChange();
+    return result;
+  };
+
+  history.replaceState = function (...args) {
+    const result = originalReplaceState(...args);
+    handleRouteChange();
+    return result;
+  };
+
+  window.addEventListener("popstate", handleRouteChange);
+}
+
+function handleRouteChange() {
+  if (window.location.pathname === lastObservedPath) {
+    queueAcceptedSubmissionCheck();
+    return;
+  }
+
+  lastObservedPath = window.location.pathname;
+  queueAcceptedSubmissionCheck();
+}
+
+function queueAcceptedSubmissionCheck() {
+  requestAnimationFrame(() => {
+    void maybeStopForAcceptedSubmission();
+  });
+}
+
+async function maybeStopForAcceptedSubmission() {
+  if (!hasAcceptedSubmissionSignal()) {
+    return;
+  }
+
+  if (!submitPending && !isSubmissionPage()) {
+    return;
+  }
+
+  const now = Date.now();
+  if (now - lastAcceptedSignalAt < 3000) {
+    return;
+  }
+  lastAcceptedSignalAt = now;
+  submitPending = false;
+
+  try {
+    await chrome.runtime.sendMessage({ type: "STOP_PLAYBACK" });
+  } catch (error) {
+    console.debug("LeetNoise failed to stop after accepted submission", error);
+  }
 }
 
 function hasAcceptedSubmissionSignal() {
