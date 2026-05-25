@@ -1,3 +1,19 @@
+const CELEBRATION_SOUND_FILES = {
+  "tada": "tada.mp3",
+  "fanfare": "fanfare.mp3",
+  "fireworks": "fireworks.mp3",
+  "crowd-cheer": "crowd-cheer.mp3",
+  "big-cheers": "big-cheers.mp3",
+  "victory": "victory.mp3",
+  "wow": "wow.mp3",
+  "correct": "correct.mp3",
+  "level-up": "level-up.mp3",
+  "level-up-bells": "level-up-bells.mp3"
+};
+
+const DEFAULT_CELEBRATION_SOUND_ID = "tada";
+const CELEBRATION_MAX_DURATION_MS = 5000;
+
 const ACTION_DEFINITIONS = [
   { type: "start", labels: ["start timer", "start stopwatch", "start"], requiresTimerContext: true },
   { type: "resume", labels: ["resume timer", "resume stopwatch", "resume"], requiresTimerContext: true },
@@ -21,10 +37,13 @@ const ACTION_DEFINITIONS = [
   }
 ];
 
+const POST_SUBMIT_MIN_WAIT_MS = 1000;
+
 let lastActionKey = "";
 let lastActionAt = 0;
 let lastAcceptedSignalAt = 0;
 let submitPending = false;
+let submitClickedAt = 0;
 let lastObservedPath = window.location.pathname;
 
 document.addEventListener("click", handleInteraction, true);
@@ -41,6 +60,8 @@ async function handleInteraction(event) {
   const submitIntent = findSubmitIntent(event);
   if (submitIntent) {
     submitPending = true;
+    submitClickedAt = Date.now();
+    setTimeout(queueAcceptedSubmissionCheck, POST_SUBMIT_MIN_WAIT_MS + 50);
   }
 
   const action = findTimerAction(event);
@@ -280,31 +301,83 @@ function queueAcceptedSubmissionCheck() {
 }
 
 async function maybeStopForAcceptedSubmission() {
-  if (!hasAcceptedSubmissionSignal()) {
-    return;
-  }
-
-  if (!submitPending && !isSubmissionPage()) {
+  if (!submitPending) {
     return;
   }
 
   const now = Date.now();
+  // Require a brief gap so the previous run's "Accepted" text has cleared
+  // before we accept it as the new result.
+  if (now - submitClickedAt < POST_SUBMIT_MIN_WAIT_MS) {
+    return;
+  }
+
+  if (!hasAcceptedSubmissionSignal()) {
+    return;
+  }
+
   if (now - lastAcceptedSignalAt < 3000) {
     return;
   }
   lastAcceptedSignalAt = now;
   submitPending = false;
 
+  console.info("LeetNoise: accepted submission detected, attempting to pause player");
+
+  await pauseOrStopPlayer();
+  await playCelebrationSound();
+}
+
+async function pauseOrStopPlayer() {
   try {
+    const response = await chrome.runtime.sendMessage({ type: "PAUSE_PLAYBACK" });
+    const paused = response && response.ok === true && response.controlled === true;
+    if (paused) {
+      console.info("LeetNoise: paused YouTube player");
+      return;
+    }
+
+    console.info("LeetNoise: pause did not take effect, closing player instead", response);
     await chrome.runtime.sendMessage({ type: "STOP_PLAYBACK" });
   } catch (error) {
-    console.debug("LeetNoise failed to stop after accepted submission", error);
+    console.debug("LeetNoise failed to pause after accepted submission", error);
+    try {
+      await chrome.runtime.sendMessage({ type: "STOP_PLAYBACK" });
+    } catch (closeError) {
+      console.debug("LeetNoise failed to close after accepted submission", closeError);
+    }
+  }
+}
+
+async function playCelebrationSound() {
+  try {
+    const stored = await chrome.storage.sync.get(["celebrationSoundId"]);
+    const id = stored.celebrationSoundId || DEFAULT_CELEBRATION_SOUND_ID;
+    if (id === "off") {
+      return;
+    }
+    const file = CELEBRATION_SOUND_FILES[id];
+    if (!file) {
+      return;
+    }
+    const audio = new Audio(chrome.runtime.getURL(`assets/sounds/${file}`));
+    audio.volume = 0.7;
+    await audio.play();
+    setTimeout(() => audio.pause(), CELEBRATION_MAX_DURATION_MS);
+  } catch (error) {
+    console.debug("LeetNoise failed to play celebration sound", error);
   }
 }
 
 function hasAcceptedSubmissionSignal() {
+  for (const element of document.querySelectorAll("[data-e2e-locator='submission-result']")) {
+    const text = normalizeText(element.textContent || "");
+    if (text.includes("accepted")) {
+      return true;
+    }
+  }
+
   const selectors = [
-    "[data-e2e-locator='submission-result']",
     "[role='dialog']",
     "[class*='submission']",
     "[class*='result']"
@@ -337,6 +410,3 @@ function isAcceptedSubmissionText(text) {
   );
 }
 
-function isSubmissionPage() {
-  return /\/submissions\/\d+/.test(window.location.pathname);
-}

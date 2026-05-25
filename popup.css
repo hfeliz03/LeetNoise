@@ -102,6 +102,7 @@ body {
 .video-list,
 .notice,
 .theme-panel,
+.celebration-panel,
 .tips,
 .popup-footer {
   margin-top: 16px;
@@ -110,6 +111,7 @@ body {
 .controls,
 .notice,
 .theme-panel,
+.celebration-panel,
 .tips,
 .video-item {
   padding: 14px;
@@ -304,6 +306,45 @@ kbd {
 .theme-label {
   font-size: 13px;
   font-weight: 700;
+}
+
+.celebration-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.celebration-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-solid);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.celebration-option:hover {
+  border-color: var(--accent-strong);
+}
+
+.celebration-option.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.celebration-icon {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.celebration-option.is-active .celebration-icon {
+  color: var(--accent);
 }
 
 .popup-footer {

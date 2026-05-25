@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "LeetNoise",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "Play focus audio from YouTube automatically when you start a LeetCode timer.",
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "https://leetcode.com/*",
@@ -25,10 +26,10 @@
     "default_popup": "popup.html",
     "default_title": "LeetNoise",
     "default_icon": {
-      "16": "assets/LeetNoisePixelLogo.png",
-      "32": "assets/LeetNoisePixelLogo.png",
-      "48": "assets/LeetNoisePixelLogo.png",
-      "128": "assets/LeetNoisePixelLogo.png"
+      "16": "assets/logo.png",
+      "32": "assets/logo.png",
+      "48": "assets/logo.png",
+      "128": "assets/logo.png"
     }
   },
   "content_scripts": [
@@ -60,6 +61,14 @@
       ],
       "matches": [
         "<all_urls>"
+      ]
+    },
+    {
+      "resources": [
+        "assets/sounds/*"
+      ],
+      "matches": [
+        "https://leetcode.com/*"
       ]
     }
   ]

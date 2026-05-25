@@ -54,15 +54,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "PAUSE_PLAYBACK") {
-    void controlPlayback("pause").then(() => sendResponse({ ok: true })).catch((error) => {
-      sendResponse({ ok: false, error: error.message });
+    void controlPlayback("pause").then((result) => {
+      sendResponse({ ok: true, controlled: result.controlled, reason: result.reason });
+    }).catch((error) => {
+      sendResponse({ ok: false, controlled: false, error: error.message });
     });
     return true;
   }
 
   if (message.type === "RESUME_PLAYBACK") {
-    void controlPlayback("play").then(() => sendResponse({ ok: true })).catch((error) => {
-      sendResponse({ ok: false, error: error.message });
+    void controlPlayback("play").then((result) => {
+      sendResponse({ ok: true, controlled: result.controlled, reason: result.reason });
+    }).catch((error) => {
+      sendResponse({ ok: false, controlled: false, error: error.message });
     });
     return true;
   }
@@ -177,17 +181,34 @@ async function getStatus() {
 async function controlPlayback(command) {
   await reconcileOwnedTabs();
   if (playerTabId === null) {
-    return;
+    return { controlled: false, reason: "no-player-tab" };
   }
 
   try {
     await waitForTabReady(playerTabId);
-    await chrome.tabs.sendMessage(playerTabId, {
+    const response = await sendToYouTubeTab(playerTabId, {
       type: "CONTROL_YOUTUBE_PLAYBACK",
       command
     });
+    return { controlled: response?.ok === true, reason: response?.ok ? "ok" : "controller-reported-failure" };
   } catch (error) {
     throw new Error("Unable to control the YouTube tab.");
+  }
+}
+
+async function sendToYouTubeTab(tabId, message) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, message);
+  } catch (initialError) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["youtube-controller.js"]
+      });
+    } catch (injectError) {
+      throw initialError;
+    }
+    return await chrome.tabs.sendMessage(tabId, message);
   }
 }
 
@@ -271,7 +292,7 @@ async function findOwnedTabs() {
 async function isOwnedPlayerTab(tabId) {
   try {
     await waitForTabReady(tabId);
-    const response = await chrome.tabs.sendMessage(tabId, {
+    const response = await sendToYouTubeTab(tabId, {
       type: "GET_LEETNOISE_OWNERSHIP"
     });
     return response?.owned === true;

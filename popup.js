@@ -8,6 +8,7 @@ const autoPlayToggle = document.getElementById("auto-play-toggle");
 const stopPlaybackButton = document.getElementById("stop-playback");
 const videoList = document.getElementById("video-list");
 const themeOptions = document.getElementById("theme-options");
+const celebrationOptions = document.getElementById("celebration-options");
 
 const THEMES = [
   { id: "leetcode-light", label: "Light", swatches: ["#fff7e6", "#ffa116", "#262626"] },
@@ -15,11 +16,31 @@ const THEMES = [
   { id: "leetcode-midnight", label: "Midnight", swatches: ["#0f1115", "#1f252d", "#ffa116"] }
 ];
 
+const CELEBRATION_SOUNDS = [
+  { id: "tada", label: "Tada", file: "tada.mp3" },
+  { id: "fanfare", label: "Fanfare", file: "fanfare.mp3" },
+  { id: "fireworks", label: "Fireworks", file: "fireworks.mp3" },
+  { id: "crowd-cheer", label: "Crowd cheer", file: "crowd-cheer.mp3" },
+  { id: "big-cheers", label: "Big cheers", file: "big-cheers.mp3" },
+  { id: "victory", label: "Victory", file: "victory.mp3" },
+  { id: "wow", label: "Wow!", file: "wow.mp3" },
+  { id: "correct", label: "Correct!", file: "correct.mp3" },
+  { id: "level-up", label: "Level up", file: "level-up.mp3" },
+  { id: "level-up-bells", label: "Level up bells", file: "level-up-bells.mp3" },
+  { id: "off", label: "Off", file: null }
+];
+
+const DEFAULT_CELEBRATION_SOUND_ID = "tada";
+const CELEBRATION_MAX_DURATION_MS = 5000;
+
+let previewAudio = null;
+
 let state = {
   videos: [],
   defaultVideoId: null,
   autoPlayOnTimer: true,
-  themeId: THEMES[0].id
+  themeId: THEMES[0].id,
+  celebrationSoundId: DEFAULT_CELEBRATION_SOUND_ID
 };
 
 bootstrap().catch((error) => {
@@ -75,6 +96,30 @@ themeOptions.addEventListener("click", async (event) => {
   setMessage("Theme updated.", true);
 });
 
+celebrationOptions.addEventListener("click", async (event) => {
+  const target = event.target instanceof HTMLElement ? event.target.closest("[data-celebration-id]") : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const celebrationSoundId = target.dataset.celebrationId;
+  if (!celebrationSoundId) {
+    return;
+  }
+
+  const sound = CELEBRATION_SOUNDS.find((entry) => entry.id === celebrationSoundId);
+  if (!sound) {
+    return;
+  }
+
+  if (celebrationSoundId !== state.celebrationSoundId) {
+    await persistState({ celebrationSoundId });
+    setMessage(`Celebration set to ${sound.label}.`, true);
+  }
+
+  playPreviewSound(sound);
+});
+
 videoList.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement ? event.target : null;
   if (!target) {
@@ -122,14 +167,29 @@ videoList.addEventListener("click", async (event) => {
 });
 
 async function bootstrap() {
-  const stored = await chrome.storage.sync.get(["videos", "defaultVideoId", "autoPlayOnTimer", "themeId"]);
+  const stored = await chrome.storage.sync.get([
+    "videos",
+    "defaultVideoId",
+    "autoPlayOnTimer",
+    "themeId",
+    "celebrationSoundId"
+  ]);
+  const celebrationSoundId = CELEBRATION_SOUNDS.some((sound) => sound.id === stored.celebrationSoundId)
+    ? stored.celebrationSoundId
+    : DEFAULT_CELEBRATION_SOUND_ID;
   state = {
     videos: Array.isArray(stored.videos) ? stored.videos : [],
     defaultVideoId: stored.defaultVideoId || null,
     autoPlayOnTimer: stored.autoPlayOnTimer !== false,
-    themeId: THEMES.some((theme) => theme.id === stored.themeId) ? stored.themeId : THEMES[0].id
+    themeId: THEMES.some((theme) => theme.id === stored.themeId) ? stored.themeId : THEMES[0].id,
+    celebrationSoundId
   };
   autoPlayToggle.checked = state.autoPlayOnTimer;
+
+  if (stored.celebrationSoundId !== celebrationSoundId) {
+    await chrome.storage.sync.set({ celebrationSoundId });
+  }
+
   render();
 }
 
@@ -143,6 +203,7 @@ function render() {
   document.body.dataset.theme = state.themeId;
   videoList.innerHTML = "";
   renderThemes();
+  renderCelebrationOptions();
 
   for (const video of state.videos) {
     const item = document.createElement("li");
@@ -192,6 +253,58 @@ function renderThemes() {
     `;
 
     themeOptions.appendChild(option);
+  }
+}
+
+function renderCelebrationOptions() {
+  celebrationOptions.innerHTML = "";
+
+  for (const sound of CELEBRATION_SOUNDS) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "celebration-option";
+    option.dataset.celebrationId = sound.id;
+    option.setAttribute("role", "radio");
+    option.setAttribute("aria-checked", String(sound.id === state.celebrationSoundId));
+
+    if (sound.id === state.celebrationSoundId) {
+      option.classList.add("is-active");
+    }
+
+    const icon = sound.id === "off" ? "off" : (sound.id === state.celebrationSoundId ? "selected" : "preview");
+    const iconLabel = icon === "off" ? "🔇" : icon === "selected" ? "✓" : "▶";
+
+    option.innerHTML = `
+      <span class="celebration-label">${escapeHtml(sound.label)}</span>
+      <span class="celebration-icon" aria-hidden="true">${iconLabel}</span>
+    `;
+
+    celebrationOptions.appendChild(option);
+  }
+}
+
+function playPreviewSound(sound) {
+  if (previewAudio) {
+    previewAudio.pause();
+    previewAudio = null;
+  }
+
+  if (!sound || !sound.file) {
+    return;
+  }
+
+  try {
+    const audio = new Audio(chrome.runtime.getURL(`assets/sounds/${sound.file}`));
+    audio.volume = 0.7;
+    previewAudio = audio;
+    void audio.play().catch(() => {});
+    setTimeout(() => {
+      if (previewAudio === audio) {
+        audio.pause();
+      }
+    }, CELEBRATION_MAX_DURATION_MS);
+  } catch (error) {
+    /* ignore preview failures */
   }
 }
 
